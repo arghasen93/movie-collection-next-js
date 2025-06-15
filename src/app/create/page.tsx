@@ -1,6 +1,7 @@
 'use client';
 import axios from 'axios';
 import { ChangeEvent, useState } from 'react';
+import SpinnerOverlay from '../SpinnerOverlay';
 
 export default function CreateMoviePage() {
   const [form, setForm] = useState({
@@ -19,7 +20,7 @@ export default function CreateMoviePage() {
     setLoading(true);
     try {
       const response = await axios.post(
-        "https://5hjl4oaz48.execute-api.ap-south-1.amazonaws.com/addMovie", // Replace with your Lambda URL
+        '/api/create-movie',
         JSON.stringify(form),
         {
           headers: {
@@ -35,10 +36,12 @@ export default function CreateMoviePage() {
       console.error("Error saving movie:", error);
     }
   };
-  if (loading) return <p>Loading...</p>;
+  
   if (error) return <p>{error}</p>;
 
   return (
+    <>
+    {loading && <SpinnerOverlay/>}
     <div className="space-y-4">
       <h1 className="text-xl font-bold">Create Movie</h1>
       <input name="Title" className="border p-2 rounded w-full" onChange={handleChange} placeholder="Title" />
@@ -50,5 +53,6 @@ export default function CreateMoviePage() {
          onClick={handleSubmit}>Create Movie</button>
       {success && <p>{success}</p>}
     </div>
+    </>
   );
 }

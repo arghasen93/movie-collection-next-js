@@ -1,6 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
+import SpinnerOverlay from "../SpinnerOverlay";
+
 type Movie = {
   Title: string;
   Genre: string;
@@ -10,30 +12,58 @@ type Movie = {
 
 export default function DashboardPage() {
   const [movies, setMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => {
-    const fetchMovies = async () => {
-      try {
-        const response = await axios.get(
-          "https://5hjl4oaz48.execute-api.ap-south-1.amazonaws.com/fetchMovies"
-        );
-        setMovies(response.data);
-      } catch (err) {
-        setError("Failed to fetch movies.");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const [lastKey, setLastKey] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true); // NEW
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const observer = useRef<IntersectionObserver | null>(null);
 
+  const fetchMovies = useCallback(async () => {
+    if (loading || !hasMore) return;
+    setLoading(true);
+
+    try {
+      const query = lastKey ? `?NextPageKey=${encodeURIComponent(lastKey)}` : '';
+      const res = await axios.get(`/api/fetch-movies${query}`);
+      const data = res.data;
+      console.log(data);
+      setMovies(prev => [...prev, ...data.items]);
+      setLastKey(data.lastEvaluatedKey || null);
+      setHasMore(!!data.lastEvaluatedKey); // update hasMore
+    } catch (err) {
+      console.error("Error fetching movies:", err);
+      setError("Failed to load movies.");
+    } finally {
+      setLoading(false);
+    }
+  }, [lastKey, loading, hasMore]);
+
+  useEffect(() => {
     fetchMovies();
   }, []);
 
-  if (loading) return <p>Loading...</p>;
+  useEffect(() => {
+    if (!hasMore || !loadMoreRef.current) return;
+
+    if (observer.current) observer.current.disconnect();
+
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        fetchMovies();
+      }
+    });
+
+    observer.current.observe(loadMoreRef.current);
+
+    return () => observer.current?.disconnect();
+  }, [fetchMovies, hasMore]);
+
   if (error) return <p>{error}</p>;
+
   return (
     <div>
+      {loading && <SpinnerOverlay />}
       <h1 className="text-2xl font-bold mb-6">Movie Dashboard</h1>
       <div className="grid md:grid-cols-3 gap-4">
         {movies.map((movie, index) => (
@@ -46,6 +76,12 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {hasMore ? (
+        <div ref={loadMoreRef} className="h-1" />
+      ) : (
+        <div className="text-center text-gray-400 my-4">No more movies to load.</div>
+      )}
     </div>
   );
 }
