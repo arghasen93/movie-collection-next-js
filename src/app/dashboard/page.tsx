@@ -29,6 +29,7 @@ export default function DashboardPage() {
       const data = res.data;
       console.log(data);
       setMovies(prev => [...prev, ...data.items]);
+      console.log(data.lastEvaluatedKey);
       setLastKey(data.lastEvaluatedKey || null);
       setHasMore(!!data.lastEvaluatedKey); // update hasMore
     } catch (err) {
